@@ -1,0 +1,190 @@
+---
+title: "HLA Freqs"
+format: html
+embed-resources: true
+---
+
+## Setup
+
+```{r setup}
+dir <- "/Users/rcslieker/Documents/ONCO/002_Projects/046_HLA_TAA_NEO/"
+knitr::opts_knit$set(root.dir = dir)
+setwd(dir)
+```
+
+## Packages
+
+```{r}
+library(ggplot2)
+library(magrittr)
+```
+
+## Function
+
+```{r}
+getFrequencySpecificNew <- function(allele, continent)
+{
+  #cat(row,"\n")
+  #dx <- data.in[row,]
+  
+  test <- XML::readHTMLTable(sprintf("http://www.allelefrequencies.net/hla6006a_scr.asp?hla_locus=&hla_locus_type=Classical&hla_allele1=%s&hla_allele2=%s&hla_selection=&hla_pop_selection=&hla_population=&hla_country=&hla_dataset=&hla_region=%s&hla_ethnic=&hla_study=&hla_sample_size=&hla_sample_size_pattern=equal&hla_sample_year=&hla_sample_year_pattern=equal&hla_level=&hla_level_pattern=equal&hla_show=&hla_order=order_1&standard=a", allele, allele, continent))
+  
+  
+  
+  testx <- test[[3]]
+  if(is.null(testx)) return()
+  
+  #testx <- testx[testx$`Sample Size` >= 1000,]
+  
+  testx$Region <- continent
+  
+  testx$AlleleFrequency <- as.numeric(testx$`Allele Frequency`)
+  #nms <- by(testx$AlleleFrequency, testx$Region, mean) %>% sort() %>% as.list() %>% names()
+  #testx$Region <- factor(testx$Region, levels=nms)
+  testx
+  
+}
+```
+
+## Read DB
+
+```{r}
+db <- rio::import("HLA_NEO_TAA.xlsx")
+```
+
+## Get continents
+
+```{r}
+load("/Users/rcslieker/Documents/LCCO/001_Projects/045_HLA_Disparity/freqs.all.complete.RData")
+regions <- unique(freqs.all.complete$Region)
+regions <- strsplit(regions, split = " \\(") %>% do.call(what=c)
+regions <- regions[-grep(")",regions)]
+
+```
+
+## Get study names
+
+```{r, eval=F}
+region.data <- lapply(regions, function(rx){
+  out.A <- getFrequencySpecificNew(allele = "A*", continent = rx)
+}) %>% do.call(what=rbind)
+
+region.data <- unique(region.data[,c("Population","Region")])
+rio::export(region.data, file="./region.data.xlsx")
+```
+
+
+## Get all alleles
+
+
+### A
+
+```{r,eval=F}
+out.A <- lapply(regions, function(rx){
+  cat(rx,"\n")
+  out <- getFrequencySpecificNew(allele = "A*", continent = rx)
+}) %>% do.call(what=rbind)
+save(out.A, file="Alleles_A.RData")
+```
+
+
+### B
+
+```{r,eval=F}
+out.B <- lapply(regions, function(rx){
+  cat(rx,"\n")
+  out1 <- getFrequencySpecificNew(allele = "B*0", continent = rx)
+  out2 <- getFrequencySpecificNew(allele = "B*1", continent = rx)
+  out3 <- getFrequencySpecificNew(allele = "B*2", continent = rx)
+  out4 <- getFrequencySpecificNew(allele = "B*3", continent = rx)
+  out5 <- getFrequencySpecificNew(allele = "B*4", continent = rx)
+  out6 <- getFrequencySpecificNew(allele = "B*5", continent = rx)
+  
+  out <- rbind(out1, out2, out3, out4, out5, out6)
+  out
+}) %>% do.call(what=rbind)
+save(out.B, file="Alleles_B.RData")
+```
+
+### C
+
+```{r,eval=F}
+out.C <- region.data <- lapply(regions, function(rx){
+  cat(rx,"\n")
+  out <- getFrequencySpecificNew(allele = "C*", continent = rx)
+}) %>% do.call(what=rbind)
+save(out.C, file="Alleles_C.RData")
+```
+
+## Class II
+
+```{r}
+tx <- unique(db$Alelele)
+tx <- tx[-grep("HLA-A", tx)]
+tx <- tx[-grep("HLA-B", tx)]
+tx <- tx[-grep("HLA-C", tx)]
+tx <- strsplit(tx,"\\/") %>% do.call(what=c) %>% gsub(pattern = "\\+", replacement = "") %>% unique()
+tx
+tx <- tx[-grep("Unrestricted", tx)]
+tx <- gsub("HLA-","",tx)
+
+```
+
+DRA, DRB, DPA, DPB, DQA, DQB
+
+
+```{r,eval=F}
+out <- lapply(tx, function(i){
+    cat(i,"\n")
+    out1 <- getFrequencySpecificNew(allele = i, continent = "")
+    save(out1, file=sprintf("./Class2/Results_ClassII_%s.RData", i))
+
+}) %>% do.call(what=rbind)
+```
+
+```{r,eval=F}
+out.class2 <- lapply(list.files("./Class2", full.names = TRUE), function(i){
+  load(i)
+  out1
+}) %>% do.call(what=rbind)
+
+save(out.class2, file="Alleles_classII.RData")
+```
+
+
+
+```{r}
+load("Alleles_A.RData")
+load("Alleles_B.RData")
+load("Alleles_C.RData")
+load("Alleles_classII.RData")
+
+```
+
+
+## Combine data
+
+```{r}
+Allele.AllStudies <- rbind(out.A, out.B, out.C, out.class2)
+dim(Allele.AllStudies)
+
+Allele.AllStudies1 <- Allele.AllStudies[Allele.AllStudies$Region != "",]
+
+Allele.AllStudies2 <- Allele.AllStudies[Allele.AllStudies$Region == "",]
+Allele.AllStudies2$Region <- Allele.AllStudies1$Region[match(Allele.AllStudies2$Population, Allele.AllStudies1$Population)]
+Allele.AllStudies2a <- Allele.AllStudies2[is.na(Allele.AllStudies2$Region),]
+Allele.AllStudies2b <- Allele.AllStudies2[!is.na(Allele.AllStudies2$Region),]
+rio::export(unique(Allele.AllStudies2a[,c("Population","Region")]), file="Additional_Regions.xlsx")
+mods <- rio::import("Additional_Regions_mod.xlsx")
+
+Allele.AllStudies2a$Region <- mods[match(Allele.AllStudies2a$Population, mods$Population),2]
+
+Allele.AllStudies <- rbind(Allele.AllStudies1, Allele.AllStudies2a, Allele.AllStudies2b)
+dim(Allele.AllStudies)
+#dim(unique(Allele.AllStudies))
+save(Allele.AllStudies, file="Allele.AllStudies.RData")
+
+
+table(Allele.AllStudies$Region)
+```
+
