@@ -4,7 +4,7 @@ library(tidyr)
 library(dplyr)
 
 timeline_neo <- read_excel(
-  "/Users/celine/Documents/PhD/HLA project/2 digit all data + undefined personalized.xlsx",
+  "I:/Research projects/Celine J/9. Side project HLA in cancer vaccinations/Final map/2 digit all data + undefined personalized.xlsx",
   sheet = "Neoantigen papers",
   range = "K2:L39",
   col_names = c("Year", "n_hla")
@@ -28,15 +28,14 @@ ggplot(
   )
 ) +
   geom_count(
-    aes(size = after_stat(n)),
-    colour = "#5E2A84"
+    aes(colour = factor(after_stat(n))),
+    size = 5
   ) +
-  scale_size_area(
-    max_size = 6,
-    breaks = c(1, 2),
-    labels = c("1", "2"),
-    name = "Number of studies"
-  ) +
+  scale_colour_manual(
+    values = c(
+    "2" = "#C8A2E8",   # light purple
+    "1" = "#5E2A84"),  # dark purple
+  name = "Number of studies") + 
   geom_smooth(
     method = "lm",
     se = FALSE,
